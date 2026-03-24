@@ -1,9 +1,12 @@
 import requests
 import os
 
+# ✅ 正确顺序
+API_KEY = os.getenv("DASHSCOPE_API_KEY")
+
 if not API_KEY:
     raise ValueError("请先设置环境变量 DASHSCOPE_API_KEY")
-API_KEY = os.getenv("DASHSCOPE_API_KEY")
+
 
 def review_code(diff_text):
     prompt = f"""
@@ -39,11 +42,11 @@ def review_code(diff_text):
     }
 
     response = requests.post(
-    url,
-    headers=headers,
-    json=data,
-    proxies={"http": None, "https": None}
-)
+        url,
+        headers=headers,
+        json=data,
+        proxies={"http": None, "https": None}
+    )
 
     result = response.json()
 
@@ -61,9 +64,13 @@ def main():
 
     print("=== AI评审结果 ===")
     print(result)
-	print("hook test")
+
+    # ✅ 修复缩进（全部4空格）
+    print("hook final test")
+
     with open("review_result.txt", "w", encoding="utf-8") as f:
-    	f.write(result)
+        f.write(result)
+
 
 if __name__ == "__main__":
     main()
