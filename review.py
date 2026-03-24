@@ -19,8 +19,8 @@ def review_code(diff_text):
 3. 安全问题
 4. 可维护性问题
 
-【输出格式】
-评分（1-5分）：
+【输出格式（必须严格遵守）】
+评分：X/5（X为1-5整数）
 
 🔴 Critical:
 🟡 Warning:
@@ -68,8 +68,8 @@ def main():
     print("=== AI评审结果 ===")
     print(result)
 
-    # ✅ 提取评分
-    score_match = re.search(r"评分[:：]\s*(\d)", result)
+    # ✅ 提取评分（必须在 main 内）
+    score_match = re.search(r"评分.*?(\d)\s*/?\s*5", result)
 
     if score_match:
         score = int(score_match.group(1))
@@ -81,7 +81,8 @@ def main():
         else:
             print("✅ AI评分通过，允许提交")
     else:
-        print("⚠️ 未识别到评分，默认允许提交")
+        print("❌ 未识别到评分，禁止提交（更安全）")
+        exit(1)
 
     print("hook final test")
 
