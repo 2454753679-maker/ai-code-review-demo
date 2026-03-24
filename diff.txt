@@ -1,0 +1,11 @@
+public class UserService {
+
+-    public String getName() {
+-        return null;
+-    }
+
++    public String getName() {
++        String name = null;
++        return name.toString();
++    }
+}
