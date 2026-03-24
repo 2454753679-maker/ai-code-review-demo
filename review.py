@@ -1,7 +1,8 @@
 import requests
 import os
+import re
 
-# ✅ 正确顺序
+# ✅ 获取环境变量
 API_KEY = os.getenv("DASHSCOPE_API_KEY")
 
 if not API_KEY:
@@ -19,6 +20,8 @@ def review_code(diff_text):
 4. 可维护性问题
 
 【输出格式】
+评分（1-5分）：
+
 🔴 Critical:
 🟡 Warning:
 🔵 Info:
@@ -65,7 +68,21 @@ def main():
     print("=== AI评审结果 ===")
     print(result)
 
-    # ✅ 修复缩进（全部4空格）
+    # ✅ 提取评分
+    score_match = re.search(r"评分[:：]\s*(\d)", result)
+
+    if score_match:
+        score = int(score_match.group(1))
+        print(f"AI评分：{score}")
+
+        if score < 4:
+            print("❌ AI评分低于4分，禁止提交！")
+            exit(1)
+        else:
+            print("✅ AI评分通过，允许提交")
+    else:
+        print("⚠️ 未识别到评分，默认允许提交")
+
     print("hook final test")
 
     with open("review_result.txt", "w", encoding="utf-8") as f:
