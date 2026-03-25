@@ -28,13 +28,22 @@ jobs:
         run: |
           python review.py
 
+      # ✅ 新增：读取 review 结果（关键）
+      - name: Read review result
+        id: review
+        run: |
+          echo "result<<EOF" >> $GITHUB_OUTPUT
+          cat review_result.txt >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      # ✅ 修改：正确评论 PR
       - name: Comment on PR
         uses: peter-evans/create-or-update-comment@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           body: |
             ### AI 代码评审结果
-            $(cat review_result.txt)
+            ${{ steps.review.outputs.result }}
 
       - name: Fail on low score
         run: |
