@@ -9,47 +9,53 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
+      - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install requests
+        run: pip install requests
 
       - name: Run AI Review
         env:
           DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
-        run: |
-          python review.py
+        run: python review.py
+        continue-on-error: true   # ⭐关键
 
-      # ✅ 新增：读取 review 结果（关键）
       - name: Read review result
         id: review
         run: |
-          echo "result<<EOF" >> $GITHUB_OUTPUT
-          cat review_result.txt >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          if [ -f review_result.txt ]; then
+            echo "result<<EOF" >> $GITHUB_OUTPUT
+            cat review_result.txt >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "result=❌ AI评审失败，未生成结果" >> $GITHUB_OUTPUT
+          fi
 
-      # ✅ 修改：正确评论 PR
       - name: Comment on PR
         uses: peter-evans/create-or-update-comment@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           body: |
-            ### AI 代码评审结果
             ${{ steps.review.outputs.result }}
 
       - name: Fail on low score
         run: |
-          SCORE=$(grep -oP "评分.*?(\d)" review_result.txt | grep -oP "\d")
+          SCORE=$(grep -oP "评分[:：]?\s*\K\d+" review_result.txt | head -1)
+
           echo "AI评分：$SCORE"
+
+          if [ -z "$SCORE" ]; then
+            echo "❌ 未识别到评分，默认失败"
+            exit 1
+          fi
+
           if [ "$SCORE" -lt 4 ]; then
             echo "❌ AI评分低于4分，阻止合并"
             exit 1
+          else
+            echo "✅ AI评分通过"
           fi
