@@ -2,24 +2,23 @@
   env:
     DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
   run: python review.py
-  continue-on-error: true   # ⭐关键！！！
+  continue-on-error: true
 
 - name: Read review result
   id: review
   run: |
     if [ -f review_result.txt ]; then
-      {
-        echo "result<<EOF"
-        cat review_result.txt
-        echo "EOF"
-      } >> $GITHUB_OUTPUT
+      CONTENT=$(base64 -w 0 review_result.txt)
+      echo "result=$CONTENT" >> $GITHUB_OUTPUT
     else
-      echo "result=❌ AI评审失败，未生成结果" >> $GITHUB_OUTPUT
+      echo "result=FAILED" >> $GITHUB_OUTPUT
     fi
+
 - name: Comment on PR
-  if: always()   # ⭐关键！！！
+  if: always()
   uses: peter-evans/create-or-update-comment@v4
   with:
     token: ${{ secrets.GITHUB_TOKEN }}
     body: |
-      ${{ steps.review.outputs.result }}
+      ### 🤖 AI代码评审结果
+      ${{ fromBase64(steps.review.outputs.result) }}
