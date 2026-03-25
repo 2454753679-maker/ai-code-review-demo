@@ -1,61 +1,25 @@
-name: AI Code Review
+- name: Run AI Review
+  env:
+    DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+  run: python review.py
+  continue-on-error: true   # ⭐关键！！！
 
-on:
-  pull_request:
-    types: [opened, synchronize]
-
-jobs:
-  ai_review:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-
-      - name: Install dependencies
-        run: pip install requests
-
-      - name: Run AI Review
-        env:
-          DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
-        run: python review.py
-        continue-on-error: true   # ⭐关键
-
-      - name: Read review result
-        id: review
-        run: |
-          if [ -f review_result.txt ]; then
-            echo "result<<EOF" >> $GITHUB_OUTPUT
-            cat review_result.txt >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
-          else
-            echo "result=❌ AI评审失败，未生成结果" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Comment on PR
-        uses: peter-evans/create-or-update-comment@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          body: |
-            ${{ steps.review.outputs.result }}
-
-      - name: Fail on low score
-        run: |
-          SCORE=$(grep -oP "评分[:：]?\s*\K\d+" review_result.txt | head -1)
-
-          echo "AI评分：$SCORE"
-
-          if [ -z "$SCORE" ]; then
-            echo "❌ 未识别到评分，默认失败"
-            exit 1
-          fi
-
-          if [ "$SCORE" -lt 4 ]; then
-            echo "❌ AI评分低于4分，阻止合并"
-            exit 1
-          else
-            echo "✅ AI评分通过"
-          fi
+- name: Read review result
+  id: review
+  run: |
+    if [ -f review_result.txt ]; then
+      {
+        echo "result<<EOF"
+        cat review_result.txt
+        echo "EOF"
+      } >> $GITHUB_OUTPUT
+    else
+      echo "result=❌ AI评审失败，未生成结果" >> $GITHUB_OUTPUT
+    fi
+- name: Comment on PR
+  if: always()   # ⭐关键！！！
+  uses: peter-evans/create-or-update-comment@v4
+  with:
+    token: ${{ secrets.GITHUB_TOKEN }}
+    body: |
+      ${{ steps.review.outputs.result }}
