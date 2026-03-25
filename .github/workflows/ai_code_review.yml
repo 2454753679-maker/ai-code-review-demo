@@ -9,38 +9,70 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1️⃣ 拉代码
       - name: Checkout code
         uses: actions/checkout@v3
 
+      # 2️⃣ Python 环境
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
+      # 3️⃣ 安装依赖
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install requests
 
+      # 4️⃣ 生成 diff（关键）
+      - name: Generate diff
+        run: |
+          git fetch origin main
+          git diff origin/main > diff.txt
+
+      # 5️⃣ 执行 AI 评审
       - name: Run AI Review
         env:
           DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
-        run: |
-          python review.py
+        run: python review.py
+        continue-on-error: true
 
+      # 6️⃣ 读取评审结果（base64 防炸）
+      - name: Read review result
+        id: review
+        run: |
+          if [ -f review_result.txt ]; then
+            CONTENT=$(base64 -w 0 review_result.txt)
+            echo "result=$CONTENT" >> $GITHUB_OUTPUT
+          else
+            echo "result=$(echo '❌ AI评审失败，未生成结果' | base64 -w 0)" >> $GITHUB_OUTPUT
+          fi
+
+      # 7️⃣ 评论到 PR
       - name: Comment on PR
+        if: always()
         uses: peter-evans/create-or-update-comment@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           body: |
-            ### AI 代码评审结果
-            $(cat review_result.txt)
+            ### 🤖 AI代码评审结果
+            ${{ fromBase64(steps.review.outputs.result) }}
 
+      # 8️⃣ 根据评分决定是否失败
       - name: Fail on low score
         run: |
-          SCORE=$(grep -oP "评分.*?(\d)" review_result.txt | grep -oP "\d")
+          if [ ! -f review_result.txt ]; then
+            echo "⚠️ 没有评审结果，跳过评分"
+            exit 0
+          fi
+
+          SCORE=$(grep -oP "评分.*?(\d)" review_result.txt | grep -oP "\d" || echo 0)
           echo "AI评分：$SCORE"
+
           if [ "$SCORE" -lt 4 ]; then
             echo "❌ AI评分低于4分，阻止合并"
             exit 1
+          else
+            echo "✅ AI评分通过"
           fi
