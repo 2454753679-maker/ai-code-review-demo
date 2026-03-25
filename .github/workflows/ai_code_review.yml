@@ -1,24 +1,57 @@
-- name: Run AI Review
-  env:
-    DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
-  run: python review.py
-  continue-on-error: true
+name: AI Code Review
 
-- name: Read review result
-  id: review
-  run: |
-    if [ -f review_result.txt ]; then
-      CONTENT=$(base64 -w 0 review_result.txt)
-      echo "result=$CONTENT" >> $GITHUB_OUTPUT
-    else
-      echo "result=FAILED" >> $GITHUB_OUTPUT
-    fi
+on:
+  pull_request:
+    types: [opened, synchronize]
 
-- name: Comment on PR
-  if: always()
-  uses: peter-evans/create-or-update-comment@v4
-  with:
-    token: ${{ secrets.GITHUB_TOKEN }}
-    body: |
-      ### 🤖 AI代码评审结果
-      ${{ fromBase64(steps.review.outputs.result) }}
+jobs:
+  ai_review:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Run AI Review
+        env:
+          DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+        run: python review.py
+        continue-on-error: true
+
+      - name: Read review result
+        id: review
+        run: |
+          if [ -f review_result.txt ]; then
+            CONTENT=$(base64 -w 0 review_result.txt)
+            echo "result=$CONTENT" >> $GITHUB_OUTPUT
+          else
+            echo "result=FAILED" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Comment on PR
+        if: always()
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          body: |
+            ### 🤖 AI代码评审结果
+            ${{ fromBase64(steps.review.outputs.result) }}
+
+      - name: Fail on low score
+        run: |
+          SCORE=$(grep -oP "评分.*?(\d)" review_result.txt | grep -oP "\d" || echo 0)
+          echo "AI评分：$SCORE"
+          if [ "$SCORE" -lt 4 ]; then
+            echo "❌ AI评分低于4分，阻止合并"
+            exit 1
+          fi
